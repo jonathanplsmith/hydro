@@ -24,6 +24,8 @@ hydro_lang = { path = "../hydro_lang", version = "=0.17.0-alpha.6", default-feat
 stageleft.workspace = true
 hdrhistogram = "7.5.4"
 serde = { version = "1", features = ["derive"] }
+futures-core = "0.3.0"
+rand = "0.10"
 
 [build-dependencies]
 stageleft_tool.workspace = true

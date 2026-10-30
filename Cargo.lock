@@ -2757,9 +2757,11 @@ dependencies = [
 name = "hydro_std"
 version = "0.17.0-alpha.6"
 dependencies = [
+ "futures-core",
  "hdrhistogram",
  "hydro_deploy",
  "hydro_lang",
+ "rand 0.10.2",
  "serde",
  "stageleft",
  "stageleft_tool",

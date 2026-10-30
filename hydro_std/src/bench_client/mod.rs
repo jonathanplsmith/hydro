@@ -1,12 +1,20 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
+use std::hash::{DefaultHasher, Hash, Hasher};
+use std::pin::Pin;
 use std::rc::Rc;
+use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
 use hdrhistogram::Histogram;
 use hdrhistogram::serialization::{Deserializer, Serializer, V2Serializer};
 use hydro_lang::live_collections::stream::{ExactlyOnce, NoOrder, TotalOrder};
+use hydro_lang::location::cluster::CLUSTER_SELF_ID;
 use hydro_lang::prelude::*;
+use rand::rngs::StdRng;
+use rand::{RngExt, SeedableRng};
 use serde::{Deserialize, Serialize};
+use stageleft::QuotedWithContext;
 
 pub mod rolling_average;
 
@@ -126,6 +134,138 @@ where
             .into_keyed_stream()
             .weaken_ordering()
     }
+}
+
+/// Yields `(request ID, scheduled send time)` drawn from a Poisson process
+///
+/// Busy-polls instead of sleeping to allow super short (sub ms) delays.
+pub struct PoissonArrivals {
+    requests_per_sec: f64,
+    rng: StdRng,
+    next_id: u32,
+    next_arrival: Option<Instant>,
+    due_by: Option<Instant>,
+}
+
+impl PoissonArrivals {
+    pub fn new(requests_per_sec: f64, seed: u64) -> Self {
+        assert!(
+            requests_per_sec > 0.0,
+            "Must issue requests at a positive rate"
+        );
+        PoissonArrivals {
+            requests_per_sec,
+            rng: StdRng::seed_from_u64(seed),
+            next_id: 0,
+            next_arrival: None,
+            due_by: None,
+        }
+    }
+
+    fn time_until_next_arrival(&mut self) -> Duration {
+        // Convert the uniform distribution to exponential
+        Duration::from_secs_f64(-(self.rng.random::<f64>()).ln() / self.requests_per_sec)
+    }
+}
+
+impl futures_core::Stream for PoissonArrivals {
+    type Item = (u32, Instant);
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        let now = Instant::now();
+        let due_by = *this.due_by.get_or_insert(now);
+        let next_arrival = match this.next_arrival {
+            Some(next_arrival) => next_arrival,
+            None => now + this.time_until_next_arrival(),
+        };
+
+        if next_arrival <= due_by {
+            let arrival = (this.next_id, next_arrival);
+            this.next_id += 1;
+            this.next_arrival = Some(next_arrival + this.time_until_next_arrival());
+            Poll::Ready(Some(arrival))
+        } else {
+            this.next_arrival = Some(next_arrival);
+            this.due_by = None;
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    }
+}
+
+/// Benchmarks workloads with an open-loop client, issuing requests using a Poisson process.
+/// * `requests_per_sec_per_node`: Average rate at which each machine issues requests
+/// * `seed`: Seed for the request schedule, combined with each machine's ID
+/// * `workload_generator`: Converts the ID of a new request into its input payload
+/// * `protocol`: The protocol to benchmark
+///
+/// Busy polls to allow super small delays.
+///
+/// ## Returns
+/// A stream of latencies per completed client request
+pub fn open_loop_bench_client<'a, Client, Input, Output>(
+    clients: &Cluster<'a, Client>,
+    requests_per_sec_per_node: impl QuotedWithContext<'a, f64, Cluster<'a, Client>>,
+    seed: impl QuotedWithContext<'a, u64, Cluster<'a, Client>>,
+    workload_generator: impl FnOnce(
+        KeyedStream<u32, (), Cluster<'a, Client>, Unbounded, NoOrder>,
+    )
+        -> KeyedStream<u32, Input, Cluster<'a, Client>, Unbounded, NoOrder>,
+    protocol: impl FnOnce(
+        KeyedStream<u32, Input, Cluster<'a, Client>, Unbounded, NoOrder>,
+    ) -> KeyedStream<u32, Output, Cluster<'a, Client>, Unbounded, NoOrder>,
+) -> KeyedStream<u32, (Output, Duration), Cluster<'a, Client>, Unbounded, NoOrder>
+where
+    Output: 'a + Clone,
+{
+    let (protocol_outputs_complete, protocol_outputs) =
+        clients.forward_ref::<KeyedStream<u32, Output, Cluster<'a, Client>, Unbounded, NoOrder>>();
+    let arrivals = clients.source_stream(q!({
+        let mut hasher = DefaultHasher::new();
+        seed.hash(&mut hasher);
+        CLUSTER_SELF_ID.hash(&mut hasher);
+        PoissonArrivals::new(requests_per_sec_per_node, hasher.finish())
+    }));
+
+    let (new_request_ids, latencies) = sliced! {
+        let new_arrivals = use::batch(arrivals, nondet!(/** Batching only delays when requests are issued; their scheduled times are fixed by the arrival process. */));
+        let current_outputs = use::batch(protocol_outputs, nondet!(/** Batching only delays when the latency of an output is measured. */));
+        
+        // Scheduled send times of outstanding requests
+        let mut in_flight = use::state(|l| l.singleton(q!(HashMap::<u32, Instant>::new())));
+        let in_flight_mut = in_flight.by_mut();
+
+        let new_request_ids = new_arrivals.map(q!(|(id, scheduled_time)| {
+            in_flight_mut.insert(id, scheduled_time);
+            id
+        }));
+
+        let latencies = current_outputs
+            .entries()
+            .map(q!(
+                |(id, output)| {
+                    let scheduled_time = in_flight_mut
+                        .remove(&id)
+                        .expect("Protocol produced an output for an unknown or completed request");
+                    (id, (output, scheduled_time.elapsed()))
+                },
+                commutative = manual_proof!(/** Each output removes a different request ID */)
+            ))
+            .into_keyed();
+
+        (new_request_ids, latencies)
+    };
+
+    let protocol_inputs = workload_generator(
+        new_request_ids
+            .map(q!(|id| (id, ())))
+            .into_keyed()
+            .weaken_ordering(),
+    );
+    protocol_outputs_complete.complete(protocol(protocol_inputs));
+
+    latencies
 }
 
 /// Computes the throughput and latency of transactions and outputs it every `interval_millis`.
