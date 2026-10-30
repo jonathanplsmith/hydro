@@ -1,4 +1,8 @@
+use std::hash::{DefaultHasher, Hash, Hasher};
+
+use bytes::Bytes;
 use hydro_lang::live_collections::stream::NoOrder;
+use hydro_lang::location::MemberId;
 use hydro_lang::location::cluster::CLUSTER_SELF_ID;
 use hydro_lang::prelude::*;
 use hydro_std::bench_client::{
@@ -6,7 +10,8 @@ use hydro_std::bench_client::{
 };
 use hydro_std::quorum::collect_quorum;
 
-use super::kv_replica::{KvPayload, Replica, kv_replica};
+use super::kv_replica::{KvOp, KvPayload, KvValue, Replica, kv_op_replica, kv_replica};
+use super::paxos::PaxosPayload;
 use super::paxos_with_client::PaxosLike;
 
 pub struct Client;
@@ -31,74 +36,17 @@ pub fn paxos_bench<'a>(
         num_clients_per_node,
         inc_i32_workload_generator,
         |input| {
-            let acceptors = paxos.log_stores().clone();
-            let (acceptor_checkpoint_complete, acceptor_checkpoint) =
-                acceptors.forward_ref::<Optional<_, _, _>>();
-
-            let sequenced_payloads = paxos.with_client(
-                clients,
-                input
-                    .entries()
-                    .map(q!(move |(virtual_id, payload)| {
-                        // Append Client ID so replicas know who to contact later
-                        (virtual_id, (CLUSTER_SELF_ID.clone(), payload))
-                    }))
-                    .assume_ordering(nondet!(/** benchmarking, order actually doesn't matter */)),
-                acceptor_checkpoint,
-                // TODO(shadaj): we should retry when a payload is dropped due to stale leader
-                nondet!(/** benchmarking, assuming no re-election */),
-                nondet!(
-                    /// clients 'own' certain keys, so interleaving elements from clients will not affect
-                    /// the order of writes to the same key
-                ),
-            );
-
-            let sequenced_to_replicas = sequenced_payloads
-                .broadcast(replicas, TCP.fail_stop().bincode(), nondet!(/** TODO */))
-                .values()
-                .map(q!(|(index, payload)| (
-                    index,
-                    payload.map(|(key, value)| KvPayload { key, value })
-                )));
-
-            // Replicas
-            let (replica_checkpoint, processed_payloads) =
-                kv_replica(replicas, sequenced_to_replicas, checkpoint_frequency);
-
-            // Get the latest checkpoint sequence per replica
-            let a_checkpoint = {
-                let a_checkpoint_largest_seqs = replica_checkpoint
-                    .broadcast(&acceptors, TCP.fail_stop().bincode(), nondet!(/** TODO */))
-                    .reduce(q!(
-                        |curr_seq, seq| {
-                            if seq > *curr_seq {
-                                *curr_seq = seq;
-                            }
-                        },
-                        commutative = verus_proof_commutative_fold!(acc = usize, item = usize)
-                    ));
-
-                sliced! {
-                    let snapshot = use::snapshot(a_checkpoint_largest_seqs, nondet!(
-                        /// even though we batch the checkpoint messages, because we reduce over the entire history,
-                        /// the final min checkpoint is deterministic
-                    ));
-
-                    let a_checkpoints_quorum_reached = snapshot
-                        .clone()
-                        .key_count()
-                        .map(q!(move |num_received| num_received == f + 1));
-
-                    // Find the smallest checkpoint seq that everyone agrees to
-                    snapshot
-                        .entries()
-                        .filter_if(a_checkpoints_quorum_reached)
-                        .map(q!(|(_sender, seq)| seq))
-                        .min()
-                }
-            };
-
-            acceptor_checkpoint_complete.complete(a_checkpoint);
+            let processed_payloads =
+                replicate_with_paxos(f, paxos, clients, replicas, input, |sequenced_payloads| {
+                    kv_replica(
+                        replicas,
+                        sequenced_payloads.map(q!(|(index, payload)| (
+                            index,
+                            payload.map(|(key, value)| KvPayload { key, value })
+                        ))),
+                        checkpoint_frequency,
+                    )
+                });
 
             let c_received_payloads = processed_payloads
                 .map(q!(|payload| (
@@ -127,6 +75,152 @@ pub fn paxos_bench<'a>(
     let aggregate_results =
         aggregate_bench_results(bench_results, client_aggregator, aggregate_interval_millis);
     print_results(aggregate_results);
+}
+
+pub fn paxos_kv<'a, V: KvValue + 'a>(
+    checkpoint_frequency: usize, // How many sequence numbers to commit before checkpointing
+    f: usize, /* Maximum number of faulty nodes. A payload has been processed once f+1 replicas have processed it. */
+    num_replicas: usize,
+    paxos: impl PaxosLike<'a>,
+    clients: &Cluster<'a, Client>,
+    replicas: &Cluster<'a, Replica>,
+    input: KeyedStream<u32, (u32, KvOp<V>), Cluster<'a, Client>, Unbounded, NoOrder>,
+) -> KeyedStream<u32, (), Cluster<'a, Client>, Unbounded, NoOrder> {
+    let replies = replicate_with_paxos(f, paxos, clients, replicas, input, |sequenced_payloads| {
+        kv_op_replica(
+            replicas,
+            sequenced_payloads.map(q!(|(index, payload)| (
+                index,
+                payload.map(|(request_id, (client, (key, op)))| KvPayload {
+                    key,
+                    value: ((client, request_id), op)
+                })
+            ))),
+            checkpoint_frequency,
+        )
+    });
+
+    let c_received_replies = replies
+        .map(q!(|((client, request_id), value_read)| (
+            client,
+            (request_id, value_read)
+        )))
+        .demux(clients, TCP.fail_stop().bincode())
+        .values()
+        // The value read is sent to the client, but not used by it
+        .map(q!(|(request_id, _value_read)| (request_id, Ok(()))));
+
+    collect_quorum::<_, _, _, ()>(c_received_replies, f + 1, num_replicas)
+        .0
+        .map(q!(|request_id| (request_id, ())))
+        .into_keyed()
+}
+
+/// Sequences the clients' inputs with Paxos, tagged with the sending client's ID, and applies them
+/// with `replica`. The checkpoints output by `replica` let the acceptors truncate their logs.
+fn replicate_with_paxos<'a, P: PaxosPayload + 'a, Output>(
+    f: usize,
+    paxos: impl PaxosLike<'a>,
+    clients: &Cluster<'a, Client>,
+    replicas: &Cluster<'a, Replica>,
+    input: KeyedStream<u32, P, Cluster<'a, Client>, Unbounded, NoOrder>,
+    replica: impl FnOnce(
+        Stream<
+            (usize, Option<(u32, (MemberId<Client>, P))>),
+            Cluster<'a, Replica>,
+            Unbounded,
+            NoOrder,
+        >,
+    ) -> (Stream<usize, Cluster<'a, Replica>, Unbounded>, Output),
+) -> Output {
+    let acceptors = paxos.log_stores().clone();
+    let (acceptor_checkpoint_complete, acceptor_checkpoint) =
+        acceptors.forward_ref::<Optional<_, _, _>>();
+
+    let sequenced_payloads = paxos.with_client(
+        clients,
+        input
+            .entries()
+            .map(q!(move |(virtual_id, payload)| {
+                // Append Client ID so replicas know who to contact later
+                (virtual_id, (CLUSTER_SELF_ID.clone(), payload))
+            }))
+            .assume_ordering(nondet!(/** benchmarking, order actually doesn't matter */)),
+        acceptor_checkpoint,
+        // TODO(shadaj): we should retry when a payload is dropped due to stale leader
+        nondet!(/** benchmarking, assuming no re-election */),
+        nondet!(
+            /// clients 'own' certain keys, so interleaving elements from clients will not affect
+            /// the order of writes to the same key
+        ),
+    );
+
+    // Replicas
+    let (replica_checkpoint, output) = replica(
+        sequenced_payloads
+            .broadcast(replicas, TCP.fail_stop().bincode(), nondet!(/** TODO */))
+            .values(),
+    );
+
+    // Get the latest checkpoint sequence per replica
+    let a_checkpoint = {
+        let a_checkpoint_largest_seqs = replica_checkpoint
+            .broadcast(&acceptors, TCP.fail_stop().bincode(), nondet!(/** TODO */))
+            .reduce(q!(
+                |curr_seq, seq| {
+                    if seq > *curr_seq {
+                        *curr_seq = seq;
+                    }
+                },
+                commutative = verus_proof_commutative_fold!(acc = usize, item = usize)
+            ));
+
+        sliced! {
+            let snapshot = use::snapshot(a_checkpoint_largest_seqs, nondet!(
+                /// even though we batch the checkpoint messages, because we reduce over the entire history,
+                /// the final min checkpoint is deterministic
+            ));
+
+            let a_checkpoints_quorum_reached = snapshot
+                .clone()
+                .key_count()
+                .map(q!(move |num_received| num_received == f + 1));
+
+            // Find the smallest checkpoint seq that everyone agrees to
+            snapshot
+                .entries()
+                .filter_if(a_checkpoints_quorum_reached)
+                .map(q!(|(_sender, seq)| seq))
+                .min()
+        }
+    };
+
+    acceptor_checkpoint_complete.complete(a_checkpoint);
+
+    output
+}
+
+pub fn kv_op_workload_generator<'a, Client>(
+    request_ids: KeyedStream<u32, (), Cluster<'a, Client>, Unbounded, NoOrder>,
+    num_keys: u32,
+    read_percent: u64,
+    value_bytes: usize,
+) -> KeyedStream<u32, (u32, KvOp<Bytes>), Cluster<'a, Client>, Unbounded, NoOrder> {
+    assert!(read_percent <= 100, "Must read at most 100% of the time");
+    request_ids
+        .entries()
+        .map(q!(move |(id, ())| {
+            // Hash so the op doesn't depend on the key
+            let mut hasher = DefaultHasher::new();
+            id.hash(&mut hasher);
+            let op = if hasher.finish() % 100 < read_percent {
+                KvOp::Get
+            } else {
+                KvOp::Put(std::iter::repeat_n(0u8, value_bytes).collect())
+            };
+            (id, (id % num_keys, op))
+        }))
+        .into_keyed()
 }
 
 /// Generates an incrementing u32 for each virtual client ID, starting at 0

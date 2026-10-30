@@ -6841,45 +6841,35 @@ expression: built.ir()
             17,
         ),
         input: Tee {
-            inner: <shared 37>: Map {
-                f: stageleft :: runtime_support :: fn1_type_hint :: < (std :: collections :: hash_map :: HashMap < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , usize) , usize > ({ use crate :: __staged :: __deps :: * ; use crate :: __staged :: cluster :: kv_replica :: * ; crate :: __staged :: __stageleft_quote_src_cluster_kv_replica_mod_rs_LINE_COL ! ([] [| (_kv_store , next_slot) | next_slot]) }),
-                input: Snapshot {
-                    inner: Fold {
-                        init: stageleft :: runtime_support :: fn0_type_hint :: < (std :: collections :: hash_map :: HashMap < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , usize) > ({ use crate :: __staged :: __deps :: * ; use crate :: __staged :: cluster :: kv_replica :: * ; crate :: __staged :: __stageleft_quote_src_cluster_kv_replica_mod_rs_LINE_COL ! ([] [| | (HashMap :: new () , 0)]) }),
-                        acc: stageleft :: runtime_support :: fn2_borrow_mut_type_hint :: < (std :: collections :: hash_map :: HashMap < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , usize) , hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , () > ({ use crate :: __staged :: __deps :: * ; use crate :: __staged :: cluster :: kv_replica :: * ; crate :: __staged :: __stageleft_quote_src_cluster_kv_replica_mod_rs_LINE_COL ! ([] [| (kv_store , next_slot) , payload | { if let Some (kv) = payload . kv { kv_store . insert (kv . key , kv . value) ; } * next_slot = payload . seq + 1 ; }]) }),
-                        input: YieldConcat {
-                            inner: Tee {
-                                inner: <shared 38>: Map {
-                                    f: stageleft :: runtime_support :: fnmut1_type_hint :: < (hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , usize) , hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > > ({ use crate :: __staged :: __deps :: * ; use crate :: __staged :: cluster :: kv_replica :: sequence_payloads :: * ; crate :: __staged :: __stageleft_quote_src_cluster_kv_replica_sequence_payloads_rs_LINE_COL ! ([] [| (sorted_payload , _) | { sorted_payload }]) }),
-                                    input: Filter {
-                                        f: stageleft :: runtime_support :: fnmut1_borrow_type_hint :: < (hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , usize) , bool > ({ use crate :: __staged :: __deps :: * ; use crate :: __staged :: cluster :: kv_replica :: sequence_payloads :: * ; crate :: __staged :: __stageleft_quote_src_cluster_kv_replica_sequence_payloads_rs_LINE_COL ! ([] [| (sorted_payload , highest_seq) | sorted_payload . seq < * highest_seq]) }),
-                                        input: CrossSingleton {
-                                            left: Tee {
-                                                inner: <shared 35>,
-                                                metadata: HydroIrMetadata {
-                                                    location_id: Tick(Some(ClockId(17)), Cluster(loc5v1)),
-                                                    collection_kind: Stream {
-                                                        bound: Bounded,
-                                                        order: TotalOrder,
-                                                        retry: ExactlyOnce,
-                                                        element_type: hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) >,
-                                                    },
+            inner: <shared 37>: Snapshot {
+                inner: Fold {
+                    init: stageleft :: runtime_support :: fn0_type_hint :: < usize > ({ use crate :: __staged :: __deps :: * ; use crate :: __staged :: cluster :: kv_replica :: * ; crate :: __staged :: __stageleft_quote_src_cluster_kv_replica_mod_rs_LINE_COL ! ([] [| | 0]) }),
+                    acc: stageleft :: runtime_support :: fn2_borrow_mut_type_hint :: < usize , hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , () > ({ use crate :: __staged :: __deps :: * ; use crate :: __staged :: cluster :: kv_replica :: * ; crate :: __staged :: __stageleft_quote_src_cluster_kv_replica_mod_rs_LINE_COL ! ([] [| next_slot , payload | { * next_slot = payload . seq + 1 ; }]) }),
+                    input: YieldConcat {
+                        inner: Tee {
+                            inner: <shared 38>: Map {
+                                f: stageleft :: runtime_support :: fnmut1_type_hint :: < (hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , usize) , hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > > ({ use crate :: __staged :: __deps :: * ; use crate :: __staged :: cluster :: kv_replica :: sequence_payloads :: * ; crate :: __staged :: __stageleft_quote_src_cluster_kv_replica_sequence_payloads_rs_LINE_COL ! ([] [| (sorted_payload , _) | { sorted_payload }]) }),
+                                input: Filter {
+                                    f: stageleft :: runtime_support :: fnmut1_borrow_type_hint :: < (hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , usize) , bool > ({ use crate :: __staged :: __deps :: * ; use crate :: __staged :: cluster :: kv_replica :: sequence_payloads :: * ; crate :: __staged :: __stageleft_quote_src_cluster_kv_replica_sequence_payloads_rs_LINE_COL ! ([] [| (sorted_payload , highest_seq) | sorted_payload . seq < * highest_seq]) }),
+                                    input: CrossSingleton {
+                                        left: Tee {
+                                            inner: <shared 35>,
+                                            metadata: HydroIrMetadata {
+                                                location_id: Tick(Some(ClockId(17)), Cluster(loc5v1)),
+                                                collection_kind: Stream {
+                                                    bound: Bounded,
+                                                    order: TotalOrder,
+                                                    retry: ExactlyOnce,
+                                                    element_type: hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) >,
                                                 },
                                             },
-                                            right: Cast {
-                                                inner: Tee {
-                                                    inner: <shared 36>,
-                                                    metadata: HydroIrMetadata {
-                                                        location_id: Tick(Some(ClockId(17)), Cluster(loc5v1)),
-                                                        collection_kind: Singleton {
-                                                            bound: Bounded,
-                                                            element_type: usize,
-                                                        },
-                                                    },
-                                                },
+                                        },
+                                        right: Cast {
+                                            inner: Tee {
+                                                inner: <shared 36>,
                                                 metadata: HydroIrMetadata {
                                                     location_id: Tick(Some(ClockId(17)), Cluster(loc5v1)),
-                                                    collection_kind: Optional {
+                                                    collection_kind: Singleton {
                                                         bound: Bounded,
                                                         element_type: usize,
                                                     },
@@ -6887,11 +6877,9 @@ expression: built.ir()
                                             },
                                             metadata: HydroIrMetadata {
                                                 location_id: Tick(Some(ClockId(17)), Cluster(loc5v1)),
-                                                collection_kind: Stream {
+                                                collection_kind: Optional {
                                                     bound: Bounded,
-                                                    order: TotalOrder,
-                                                    retry: ExactlyOnce,
-                                                    element_type: (hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , usize),
+                                                    element_type: usize,
                                                 },
                                             },
                                         },
@@ -6911,7 +6899,7 @@ expression: built.ir()
                                             bound: Bounded,
                                             order: TotalOrder,
                                             retry: ExactlyOnce,
-                                            element_type: hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) >,
+                                            element_type: (hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , usize),
                                         },
                                     },
                                 },
@@ -6926,9 +6914,9 @@ expression: built.ir()
                                 },
                             },
                             metadata: HydroIrMetadata {
-                                location_id: Atomic(Tick(Some(ClockId(17)), Cluster(loc5v1))),
+                                location_id: Tick(Some(ClockId(17)), Cluster(loc5v1)),
                                 collection_kind: Stream {
-                                    bound: Unbounded,
+                                    bound: Bounded,
                                     order: TotalOrder,
                                     retry: ExactlyOnce,
                                     element_type: hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) >,
@@ -6937,17 +6925,19 @@ expression: built.ir()
                         },
                         metadata: HydroIrMetadata {
                             location_id: Atomic(Tick(Some(ClockId(17)), Cluster(loc5v1))),
-                            collection_kind: Singleton {
+                            collection_kind: Stream {
                                 bound: Unbounded,
-                                element_type: (std :: collections :: hash_map :: HashMap < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , usize),
+                                order: TotalOrder,
+                                retry: ExactlyOnce,
+                                element_type: hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) >,
                             },
                         },
                     },
                     metadata: HydroIrMetadata {
-                        location_id: Tick(Some(ClockId(17)), Cluster(loc5v1)),
+                        location_id: Atomic(Tick(Some(ClockId(17)), Cluster(loc5v1))),
                         collection_kind: Singleton {
-                            bound: Bounded,
-                            element_type: (std :: collections :: hash_map :: HashMap < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , usize),
+                            bound: Unbounded,
+                            element_type: usize,
                         },
                     },
                 },
@@ -7671,25 +7661,38 @@ expression: built.ir()
                                         input: Cast {
                                             inner: Map {
                                                 f: stageleft :: runtime_support :: fnmut1_type_hint :: < hydro_test :: __staged :: cluster :: kv_replica :: KvPayload < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , ((u32 , i32) , core :: result :: Result < () , () >)) > ({ use crate :: __staged :: __deps :: * ; use crate :: __staged :: cluster :: paxos_bench :: * ; crate :: __staged :: __stageleft_quote_src_cluster_paxos_bench_rs_LINE_COL ! ([] [| payload | (payload . value . 0 , ((payload . key , payload . value . 1) , Ok (())))]) }),
-                                                input: YieldConcat {
-                                                    inner: FilterMap {
-                                                        f: stageleft :: runtime_support :: fnmut1_type_hint :: < hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , core :: option :: Option < hydro_test :: __staged :: cluster :: kv_replica :: KvPayload < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > > > ({ use crate :: __staged :: __deps :: * ; use crate :: __staged :: cluster :: kv_replica :: * ; crate :: __staged :: __stageleft_quote_src_cluster_kv_replica_mod_rs_LINE_COL ! ([] [| payload | payload . kv]) }),
-                                                        input: Tee {
-                                                            inner: <shared 38>,
+                                                input: Scan {
+                                                    init: stageleft :: runtime_support :: fn0_type_hint :: < std :: collections :: hash_map :: HashMap < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > > ({ use crate :: __staged :: __deps :: * ; use crate :: __staged :: cluster :: kv_replica :: * ; crate :: __staged :: __stageleft_quote_src_cluster_kv_replica_mod_rs_LINE_COL ! ([] [| | HashMap :: new ()]) }),
+                                                    acc: stageleft :: runtime_support :: fn2_borrow_mut_type_hint :: < std :: collections :: hash_map :: HashMap < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , hydro_test :: __staged :: cluster :: kv_replica :: KvPayload < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , core :: option :: Option < hydro_test :: __staged :: cluster :: kv_replica :: KvPayload < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > > > ({ use crate :: __staged :: __deps :: * ; use crate :: __staged :: cluster :: kv_replica :: * ; crate :: __staged :: __stageleft_quote_src_cluster_kv_replica_mod_rs_LINE_COL ! ([] [| kv_store , payload | { kv_store . insert (payload . key . clone () , payload . value . clone ()) ; Some (payload) }]) }),
+                                                    input: YieldConcat {
+                                                        inner: FilterMap {
+                                                            f: stageleft :: runtime_support :: fnmut1_type_hint :: < hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > , core :: option :: Option < hydro_test :: __staged :: cluster :: kv_replica :: KvPayload < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) > > > ({ use crate :: __staged :: __deps :: * ; use crate :: __staged :: cluster :: kv_replica :: * ; crate :: __staged :: __stageleft_quote_src_cluster_kv_replica_mod_rs_LINE_COL ! ([] [| payload | payload . kv]) }),
+                                                            input: Tee {
+                                                                inner: <shared 38>,
+                                                                metadata: HydroIrMetadata {
+                                                                    location_id: Tick(Some(ClockId(17)), Cluster(loc5v1)),
+                                                                    collection_kind: Stream {
+                                                                        bound: Bounded,
+                                                                        order: TotalOrder,
+                                                                        retry: ExactlyOnce,
+                                                                        element_type: hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) >,
+                                                                    },
+                                                                },
+                                                            },
                                                             metadata: HydroIrMetadata {
                                                                 location_id: Tick(Some(ClockId(17)), Cluster(loc5v1)),
                                                                 collection_kind: Stream {
                                                                     bound: Bounded,
                                                                     order: TotalOrder,
                                                                     retry: ExactlyOnce,
-                                                                    element_type: hydro_test :: __staged :: cluster :: kv_replica :: SequencedKv < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) >,
+                                                                    element_type: hydro_test :: __staged :: cluster :: kv_replica :: KvPayload < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) >,
                                                                 },
                                                             },
                                                         },
                                                         metadata: HydroIrMetadata {
-                                                            location_id: Tick(Some(ClockId(17)), Cluster(loc5v1)),
+                                                            location_id: Cluster(loc5v1),
                                                             collection_kind: Stream {
-                                                                bound: Bounded,
+                                                                bound: Unbounded,
                                                                 order: TotalOrder,
                                                                 retry: ExactlyOnce,
                                                                 element_type: hydro_test :: __staged :: cluster :: kv_replica :: KvPayload < u32 , (hydro_test :: __staged :: __deps :: hydro_lang :: location :: member_id :: MemberId < hydro_test :: __staged :: cluster :: paxos_bench :: Client > , i32) >,

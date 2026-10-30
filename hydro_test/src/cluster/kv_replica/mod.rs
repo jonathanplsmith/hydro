@@ -42,7 +42,12 @@ impl<K: KvKey, V: KvValue> PartialOrd for SequencedKv<K, V> {
     }
 }
 
-// Replicas. All relations for replicas will be prefixed with r. Expects ReplicaPayload on p_to_replicas, outputs a stream of (client address, ReplicaPayload) after processing.
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug)]
+pub enum KvOp<V> {
+    Get,
+    Put(V),
+}
+
 pub fn kv_replica<'a, K: KvKey, V: KvValue>(
     replicas: &Cluster<'a, Replica>,
     p_to_replicas: impl Into<
@@ -53,29 +58,80 @@ pub fn kv_replica<'a, K: KvKey, V: KvValue>(
     Stream<usize, Cluster<'a, Replica>, Unbounded>,
     Stream<KvPayload<K, V>, Cluster<'a, Replica>, Unbounded>,
 ) {
-    let p_to_replicas: Stream<SequencedKv<K, V>, Cluster<'a, Replica>, Unbounded, NoOrder> =
-        p_to_replicas
-            .into()
-            .map(q!(|(slot, kv)| SequencedKv { seq: slot, kv }));
+    let (checkpoints, payloads) = sequenced_replica(replicas, p_to_replicas, checkpoint_frequency);
+    let applied_payloads = payloads.scan(
+        q!(|| HashMap::new()),
+        q!(|kv_store, payload| {
+            kv_store.insert(payload.key.clone(), payload.value.clone());
+            Some(payload)
+        }),
+    );
+    (checkpoints, applied_payloads)
+}
+
+/// Like [`kv_replica`], but applies tagged [`KvOp`]s, allowing reading and writing. Only returns the tag
+pub fn kv_op_replica<'a, K: KvKey, Tag: KvValue, V: KvValue>(
+    replicas: &Cluster<'a, Replica>,
+    p_to_replicas: impl Into<
+        Stream<
+            (usize, Option<KvPayload<K, (Tag, KvOp<V>)>>),
+            Cluster<'a, Replica>,
+            Unbounded,
+            NoOrder,
+        >,
+    >,
+    checkpoint_frequency: usize,
+) -> (
+    Stream<usize, Cluster<'a, Replica>, Unbounded>,
+    Stream<(Tag, Option<V>), Cluster<'a, Replica>, Unbounded>,
+) {
+    let (checkpoints, payloads) = sequenced_replica(replicas, p_to_replicas, checkpoint_frequency);
+    let values_read = payloads.scan(
+        q!(|| HashMap::new()),
+        q!(|kv_store, payload| {
+            let (tag, op) = payload.value;
+            let value_read = match op {
+                KvOp::Get => kv_store.get(&payload.key).cloned(),
+                KvOp::Put(value) => {
+                    kv_store.insert(payload.key, value);
+                    None
+                }
+            };
+            Some((tag, value_read))
+        }),
+    );
+    (checkpoints, values_read)
+}
+
+
+/// Orders the operations decided by Paxos so they can be applied. 
+fn sequenced_replica<'a, K: KvKey, V: KvValue>(
+    replicas: &Cluster<'a, Replica>,
+    p_to_replicas: impl Into<
+        Stream<(usize, Option<KvPayload<K, V>>), Cluster<'a, Replica>, Unbounded, NoOrder>,
+    >,
+    checkpoint_frequency: usize,
+) -> (
+    Stream<usize, Cluster<'a, Replica>, Unbounded>,
+    Stream<KvPayload<K, V>, Cluster<'a, Replica>, Unbounded>,
+) {
+    let p_to_replicas = p_to_replicas
+        .into()
+        .map(q!(|(slot, kv)| SequencedKv { seq: slot, kv }));
 
     let replica_tick = replicas.tick();
 
     let (r_processable_payloads, r_next_slot_complete_cycle) =
         sequence_payloads::sequence_payloads(&replica_tick, p_to_replicas);
 
-    let r_kv_store = r_processable_payloads.clone().across_ticks(|s| {
+    let r_next_slot = r_processable_payloads.clone().across_ticks(|s| {
         s.fold(
-            q!(|| (HashMap::new(), 0)),
-            q!(|(kv_store, next_slot), payload| {
-                if let Some(kv) = payload.kv {
-                    kv_store.insert(kv.key, kv.value);
-                }
+            q!(|| 0),
+            q!(|next_slot, payload| {
                 *next_slot = payload.seq + 1;
             }),
         )
     });
-    // Update the highest seq for the next tick
-    let r_next_slot = r_kv_store.map(q!(|(_kv_store, next_slot)| next_slot));
     r_next_slot_complete_cycle.complete_next_tick(r_next_slot.clone());
 
     // Send checkpoints to the acceptors when we've processed enough payloads
@@ -103,9 +159,8 @@ pub fn kv_replica<'a, K: KvKey, V: KvValue>(
         ));
     r_checkpointed_seqs_complete_cycle.complete_next_tick(r_checkpoint_seq_new.clone());
 
-    // Tell clients that the payload has been committed. All ReplicaPayloads contain the client's machine ID (to string) as value.
-    let r_to_clients = r_processable_payloads
+    let r_payloads = r_processable_payloads
         .filter_map(q!(|payload| payload.kv))
         .all_ticks();
-    (r_checkpoint_seq_new.all_ticks(), r_to_clients)
+    (r_checkpoint_seq_new.all_ticks(), r_payloads)
 }

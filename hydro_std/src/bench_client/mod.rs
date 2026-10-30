@@ -164,7 +164,7 @@ impl PoissonArrivals {
 
     fn time_until_next_arrival(&mut self) -> Duration {
         // Convert the uniform distribution to exponential
-        Duration::from_secs_f64(-(self.rng.random::<f64>()).ln() / self.requests_per_sec)
+        Duration::from_secs_f64(-(1.0 - self.rng.random::<f64>()).ln() / self.requests_per_sec)
     }
 }
 

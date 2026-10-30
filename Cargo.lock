@@ -2778,6 +2778,7 @@ dependencies = [
  "dfir_rs",
  "example_test",
  "futures",
+ "hdrhistogram",
  "hydro_build_utils",
  "hydro_deploy",
  "hydro_lang",
