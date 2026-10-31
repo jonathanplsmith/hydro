@@ -85,6 +85,12 @@ required-features = ["tokio"]
 harness = false
 bench = false
 
+[[bench]]
+name = "ping_pong_bench"
+required-features = ["tokio"]
+harness = false
+bench = false
+
 [[example]]
 name = "paxos"
 required-features = ["tokio"]
