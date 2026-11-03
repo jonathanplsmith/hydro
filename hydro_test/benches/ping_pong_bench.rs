@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use clap::Parser;
 use futures::StreamExt;
 use hdrhistogram::Histogram;
-use hydro_deploy::Deployment;
+use hydro_deploy::{Deployment, LocalhostHost};
 use hydro_lang::deploy::TrybuildHost;
 use hydro_lang::prelude::*;
 use hydro_std::bench_client::{
@@ -44,6 +44,10 @@ struct Args {
     #[arg(long, default_value_t = 5)]
     warmup_secs: u64,
 
+    // Use TCP instead of Unix sockets between local processes
+    #[arg(long)]
+    tcp: bool,
+
     #[arg(long, hide = true)]
     bench: bool,
 }
@@ -54,7 +58,7 @@ async fn main() {
     let quorum = args.quorum.unwrap_or(args.responders);
     let reply_bytes = args.reply_bytes.unwrap_or(args.request_bytes);
     let mut deployment = Deployment::new();
-    let localhost = deployment.Localhost();
+    let localhost = deployment.add_host(|id| LocalhostHost::new(id).force_tcp(args.tcp));
 
     let mut builder = FlowBuilder::new();
     let external = builder.external::<()>();

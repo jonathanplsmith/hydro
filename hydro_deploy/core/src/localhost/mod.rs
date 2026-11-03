@@ -28,6 +28,7 @@ static LOCAL_LIBDIR: OnceLock<String> = OnceLock::new();
 pub struct LocalhostHost {
     pub id: usize,
     client_only: bool,
+    force_tcp: bool,
 }
 
 impl LocalhostHost {
@@ -35,6 +36,7 @@ impl LocalhostHost {
         LocalhostHost {
             id,
             client_only: false,
+            force_tcp: false,
         }
     }
 
@@ -42,7 +44,14 @@ impl LocalhostHost {
         LocalhostHost {
             id: self.id,
             client_only: true,
+            force_tcp: self.force_tcp,
         }
+    }
+
+    /// If `force_tcp` is set, connections to this host use TCP even where a Unix socket
+    /// would otherwise be chosen.
+    pub fn force_tcp(self, force_tcp: bool) -> LocalhostHost {
+        LocalhostHost { force_tcp, ..self }
     }
 }
 
@@ -77,6 +86,7 @@ impl Host for LocalhostHost {
         }
 
         if matches!(network_hint, PortNetworkHint::Auto)
+            && !self.force_tcp
             && connection_from.can_connect_to(ClientStrategy::UnixSocket(self.id))
         {
             Ok((
